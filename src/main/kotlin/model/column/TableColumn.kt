@@ -1,6 +1,5 @@
 package org.cutlery.model.column
 
-import org.cutlery.model.ColumnType
 import org.cutlery.model.Table
 
 class TableColumn(name: String, values: List<Table>) : Column<Table>(name, values, ColumnType.TABLE) {

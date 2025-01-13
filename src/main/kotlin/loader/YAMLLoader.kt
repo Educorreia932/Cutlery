@@ -13,9 +13,8 @@ import java.io.File
 class YAMLLoader : Loader {
 	override fun load(file: File): Table {
 		val yamlMapper = ObjectMapper(YAMLFactory()).registerKotlinModule()
+		val data: Map<String, Any> = yamlMapper.readValue(file, Map::class.java) as Map<String, Any>
 
-		val map: Map<String, Any> = yamlMapper.readValue(file, Map::class.java) as Map<String, Any>
-
-		return Table.fromMap(map)
+		return Table.fromMap(data)
 	}
 }

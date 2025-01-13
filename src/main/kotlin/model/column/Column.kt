@@ -1,8 +1,8 @@
 package org.cutlery.model.column
 
-import org.cutlery.model.ColumnType
+import org.cutlery.model.Table
 
-abstract class Column<T>(val name: String, values: List<T>, val type: ColumnType) {
+abstract class Column<T>(var name: String, values: List<T>, val type: ColumnType) {
 	var values = values.toMutableList()
 
 	fun get(index: Int): T {
@@ -16,7 +16,7 @@ abstract class Column<T>(val name: String, values: List<T>, val type: ColumnType
 	fun size(): Int {
 		return values.size
 	}
-	
+
 	fun isEmpty(): Boolean {
 		return values.isEmpty()
 	}
@@ -24,8 +24,20 @@ abstract class Column<T>(val name: String, values: List<T>, val type: ColumnType
 	fun forEach(action: (T) -> Unit) {
 		values.forEach(action)
 	}
-	
+
 	fun rows(start: Int, end: Int? = null) {
 		values = values.subList(start, end ?: (start + 1))
+	}
+
+	fun slice(start: Int, end: Int? = null): Column<*> {
+		return when (type) {
+			ColumnType.NUMBER -> NumberColumn(name, values.subList(start, end ?: (start + 1)).map { it as Double })
+			ColumnType.STRING -> StringColumn(name, values.subList(start, end ?: (start + 1)).map { it as String })
+			ColumnType.TABLE -> TableColumn(name, values.subList(start, end ?: (start + 1)).map { it as Table })
+		}
+	}
+
+	fun clear() {
+		values.clear()
 	}
 }

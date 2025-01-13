@@ -3,17 +3,13 @@ package org.cutlery.dsl
 import org.cutlery.loader.JSONLoader
 import org.cutlery.loader.XMLLoader
 import org.cutlery.loader.YAMLLoader
-import org.cutlery.model.ColumnType
 import org.cutlery.model.Table
-import org.cutlery.model.column.Column
-import org.cutlery.model.column.SortableColumn
-import org.cutlery.model.column.TableColumn
+import org.cutlery.model.column.*
 import org.cutlery.saver.JSONSaver
 import org.cutlery.utils.GlobFileVisitor
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Paths
-
 
 class Merge(private var tables: MutableList<Table> = mutableListOf()) {
 	fun addTable(table: Table) {
@@ -48,8 +44,8 @@ class Concat(private var tables: MutableList<Table> = mutableListOf()) {
 	}
 }
 
-class DSL(var table: Table = Table(), withMetadata: Boolean = false) {
-	fun load(filename: String) {
+class TableBuilder(var table: Table = Table()) {
+	fun load(filename: String, withMetadata: Boolean = false) {
 		val fileVisitor = GlobFileVisitor(filename)
 
 		Files.walkFileTree(Paths.get("src/test/resources"), fileVisitor)
@@ -67,10 +63,23 @@ class DSL(var table: Table = Table(), withMetadata: Boolean = false) {
 				else -> throw IllegalArgumentException("Unsupported file extension")
 			}
 
-			tables.add(loader.load(file))
+			val loadedTable = loader.load(file)
+
+			if (withMetadata)
+				loadedTable.addColumn(StringColumn("File", listOf(file.name)))
+
+			tables.add(loadedTable)
 		}
 
-		table = Concat(tables).concat()
+		if (tables.size == 1)
+			table = tables.first()
+		else {
+			tables.forEachIndexed { index, value ->
+				val column = TableColumn(index.toString(), listOf(value))
+
+				table.addColumn(column)
+			}
+		}
 	}
 
 	fun save(filename: String) {
@@ -85,28 +94,33 @@ class DSL(var table: Table = Table(), withMetadata: Boolean = false) {
 	}
 
 	fun columns(init: ColumnSelection.() -> Unit) {
-		table = ColumnSelection(table).apply(init).table
+		table = ColumnSelection(table).apply(init).result()
 	}
 
 	fun rows(start: Int, end: Int? = null) {
 		table.columns.forEach { it.rows(start, end) }
 	}
 
-	fun unstack(columnName: String) {
-		val column = table.getColumn(columnName)
+	fun extract(columnName: String): Table {
+		val columnToExtract = table.getColumn(columnName)
 
-		if (column.type != ColumnType.TABLE)
+		if (columnToExtract.type != ColumnType.TABLE)
 			throw IllegalArgumentException("Column is not a table column")
 
 		var newTable = Table()
 		val subTables: MutableList<Table> = mutableListOf()
 
-		for (subTable in column.values) {
+		for (subTable in columnToExtract.values) {
 			subTables.add(subTable as Table)
 			newTable = Concat(subTables).concat()
 		}
 
-		table = newTable
+		table.removeColumn(columnName)
+
+		for (column in newTable.columns)
+			table.addColumn(column)
+
+		return newTable
 	}
 
 	fun sort(columnName: String, ascending: Boolean = true) {
@@ -117,30 +131,111 @@ class DSL(var table: Table = Table(), withMetadata: Boolean = false) {
 
 		column.sort(ascending)
 	}
-}
 
-class ColumnSelection(var table: Table) {
-	fun withName(columnName: String) {
+	fun unstack() {
 		val newTable = Table()
 
-		val column = table.getColumn(columnName)
+		table.columns.forEach { column ->
+			if (column.type != ColumnType.TABLE)
+				throw IllegalArgumentException("Column is not a table column")
 
-		newTable.addColumn(column)
+			val subTable = column.values[0] as Table
+
+			subTable.columns.forEach {
+				if (!newTable.hasColumn(it.name))
+					newTable.addColumn(it)
+				else
+					for (value in it.values)
+						newTable.getColumn(it.name).add(value)
+			}
+		}
 
 		table = newTable
 	}
 
-	fun withType(columnType: ColumnType) {
-		table.columns = table.columns.filter { it.type == columnType }.toMutableList()
+	fun stack() {
+		val newTable = Table()
+
+		for (i in 0 until table.columns[0].size()) {
+			val newColumn = TableColumn(i.toString(), mutableListOf())
+			val subTable = Table()
+
+			for (column in table.columns)
+				subTable.addColumn(column.slice(i))
+
+			newColumn.add(subTable)
+			newTable.addColumn(newColumn)
+		}
+
+		table = newTable
+	}
+
+	fun rename(columnName: String, newColumnName: String) {
+		val column = table.getColumn(columnName)
+
+		column.name = newColumnName
+	}
+
+	fun unravel() {
+		val columnNames = table.columns.map { it.name }
+
+		for ((i, columnName) in columnNames.withIndex()) {
+			when (table.getColumn(columnName)) {
+				is TableColumn -> {
+					val extractedTable = extract(columnName)
+
+					for (column in extractedTable.columns)
+						rename(column.name, "${column.name} #${i + 1}")
+				}
+			}
+
+		}
+	}
+
+	fun forEach(init: TableBuilder.() -> Unit) {
+		table.columns.forEach {
+			val newTable = TableBuilder(it.get(0) as Table).apply(init).table
+
+			it.clear()
+			it.add(newTable)
+		}
 	}
 }
 
-fun dsl(init: DSL.() -> Unit): Table {
-	return DSL().apply(init).table
+class ColumnSelection(val table: Table) {
+	private val columns = mutableListOf<Column<*>>()
+
+	fun withName(vararg columnName: String) {
+		columns.addAll(table.columns.filter { it.name in columnName }.toMutableList())
+	}
+
+	fun withType(columnType: ColumnType, invert: Boolean = false) {
+		columns.addAll(table.columns.filter { (it.type == columnType) xor invert }.toMutableList())
+	}
+
+	fun result(): Table {
+		val newTable = Table()
+
+		columns.forEach { column ->
+			newTable.addColumn(column)
+		}
+
+		return newTable
+	}
 }
 
-fun merge(vararg tables: Table): DSL {
-	return DSL(Merge().apply {
+fun table(init: TableBuilder.() -> Unit): Table {
+	return TableBuilder().apply(init).table
+}
+
+fun merge(vararg tables: Table): TableBuilder {
+	return TableBuilder(Merge().apply {
 		tables.forEach { addTable(it) }
 	}.merge())
+}
+
+fun concat(vararg tables: Table): TableBuilder {
+	return TableBuilder(Concat().apply {
+		tables.forEach { addTable(it) }
+	}.concat())
 }

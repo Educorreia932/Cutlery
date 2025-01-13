@@ -1,6 +1,7 @@
-import org.cutlery.dsl.dsl
+import org.cutlery.dsl.concat
+import org.cutlery.dsl.table
 import org.cutlery.dsl.merge
-import org.cutlery.model.ColumnType
+import org.cutlery.model.column.ColumnType
 import kotlin.test.Test
 
 class Tests {
@@ -10,9 +11,23 @@ class Tests {
 	fun `Example 1`() {
 		val folder = "${resourcesLocation}/example1"
 
-		dsl {
-			load("${folder}/*.yaml")
-			columns { withName("params") }
+		concat(
+			table {
+				load("${folder}/decision_tree_1.yaml", true)
+			},
+			table {
+				load("${folder}/decision_tree_2.yaml", true)
+			},
+			table {
+				load("${folder}/decision_tree_3.yaml", true)
+			}
+		).apply {
+			extract("params")
+			columns { withName("criterion", "splitter", "ccp_alpha", "min_samples_split", "File") }
+			rename("criterion", "Criterion")
+			rename("splitter", "Splitter")
+			rename("ccp_alpha", "CCP Alpha")
+			rename("min_samples_split", "Min Samples Split")
 			save("example1.json")
 		}
 	}
@@ -22,18 +37,23 @@ class Tests {
 		val folder = "${resourcesLocation}/example2"
 
 		merge(
-//			dsl {
-//				load("${folder}/vitis-report.xml")
-//				columns { withName("AreaEstimates") }
-//				unstack("AreaEstimates")
-//			},
-//			dsl {
-//				load("${folder}/decision_tree.yaml")
-//				columns { withType(ColumnType.TABLE) }
-//			},
-			dsl {
+			table {
+				load("${folder}/vitis-report.xml")
+				extract("AreaEstimates")
+				columns { withName("Resources") }
+			},
+			table {
+				load("${folder}/decision_tree.yaml")
+				columns {
+					withType(ColumnType.TABLE, true)
+					withName("params")
+				}
+			},
+			table {
 				load("${folder}/profiling.json")
-				unstack("functions")
+				extract("functions")
+				unstack()
+				columns { withName("name", "time%") }
 				sort("time%", false)
 				rows(0)
 			},
@@ -46,16 +66,42 @@ class Tests {
 		val folder = "${resourcesLocation}/example3"
 
 		merge(
-			dsl {
+			table {
 				load("${folder}/**/analysis.yaml")
+				forEach {
+					extract("total")
+					extract("results")
+					columns { withName("dynamic") }
+					extract("dynamic")
+					rename("iterations", "Iterations (Dynamic)")
+					rename("calls", "Calls (Dynamic)")
+				}
 			},
-			dsl {
+			table {
 				load("${folder}/**/analysis.xml")
+				forEach {
+					extract("total")
+					extract("results")
+					columns { withName("static") }
+					extract("static")
+					rename("nodes", "Nodes (Static)")
+					rename("functions", "Functions (Static)")
+				}
 			},
-			dsl {
+			table {
 				load("${folder}/**/profiling.json")
+				forEach {
+					extract("functions")
+					unstack()
+					rows(0, 3)
+					columns { withName("name", "time%") }
+					stack()
+					unravel()
+				}
 			}
-		)
-			.save("example3.json")
+		).apply {
+			unstack()
+			save("example3.json")
+		}
 	}
 }

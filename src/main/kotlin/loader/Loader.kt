@@ -4,5 +4,5 @@ import org.cutlery.model.Table
 import java.io.File
 
 interface Loader {
-	fun load(file: File): Table // TODO: Add metadata
+	fun load(file: File): Table 
 }

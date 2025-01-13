@@ -15,8 +15,8 @@ class XMLLoader : Loader {
 		).registerKotlinModule()
 			.enable(SerializationFeature.WRAP_ROOT_VALUE)
 
-		val map: Map<String, Any> = xmlMapper.readValue(file, Map::class.java) as Map<String, Any>
+		val data: Map<String, Any> = xmlMapper.readValue(file, Map::class.java) as Map<String, Any>
 
-		return Table.fromMap(map)
+		return Table.fromMap(data)
 	}
 }

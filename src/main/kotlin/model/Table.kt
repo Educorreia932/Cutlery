@@ -15,6 +15,14 @@ class Table {
 	fun getColumn(columnName: String): Column<*> {
 		return columns.find { it.name == columnName } ?: throw IllegalArgumentException("Column not found")
 	}
+	
+	fun hasColumn(columnName: String): Boolean {
+		return columns.any { it.name == columnName }
+	}
+
+	fun removeColumn(columnName: String) {
+		columns.removeIf { it.name == columnName }
+	}
 
 	fun concat(other: Table) {
 		for (otherColumn in other.columns) {
@@ -63,8 +71,9 @@ class Table {
 						StringColumn(key, listOf(value))
 				}
 
-				is Int -> NumberColumn(key, listOf(value.toFloat()))
+				is Int -> NumberColumn(key, listOf(value))
 				is Float -> NumberColumn(key, listOf(value))
+				is Double -> NumberColumn(key, listOf(value))
 				is List<*> -> TableColumn(key, listOf(buildArrayTable(value)))
 				is Map<*, *> -> TableColumn(key, listOf(buildTable(value as Map<String, Any>)))
 				else -> StringColumn(key, listOf())
