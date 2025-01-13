@@ -192,6 +192,10 @@ class TableBuilder(var table: Table = Table()) {
 		}
 	}
 
+	fun aggregate(init: Aggregation.() -> Unit) {
+		table = Aggregation(table).apply(init).table
+	}
+
 	fun forEach(init: TableBuilder.() -> Unit) {
 		table.columns.forEach {
 			val newTable = TableBuilder(it.get(0) as Table).apply(init).table
@@ -221,6 +225,28 @@ class ColumnSelection(val table: Table) {
 		}
 
 		return newTable
+	}
+}
+
+class Aggregation(val table: Table) {
+	fun sum() {
+		table.columns.forEach {
+			if (it is NumberColumn)
+				it.add(it.sum())
+			
+			else
+				it.add(null)
+		}
+	}
+
+	fun average() {
+		table.columns.forEach {
+			if (it is NumberColumn)
+				it.add(it.average())
+
+			else
+				it.add(null)
+		}
 	}
 }
 

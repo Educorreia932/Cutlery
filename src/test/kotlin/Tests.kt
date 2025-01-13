@@ -101,6 +101,10 @@ class Tests {
 			}
 		).apply {
 			unstack()
+			aggregate {
+				sum()
+				average()
+			}
 			save("example3.json")
 		}
 	}

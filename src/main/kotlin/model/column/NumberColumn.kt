@@ -8,4 +8,13 @@ class NumberColumn(name: String, values: List<Number>) : Column<Number>(name, va
 		else
 			values.sortByDescending { it.toDouble() }
 	}
+
+	fun sum(): Number {
+		return values.sumOf { it.toDouble() }
+	}
+
+	fun average(): Number {
+		return values.sumOf { it.toDouble() } / size()
+	}
 }
+
