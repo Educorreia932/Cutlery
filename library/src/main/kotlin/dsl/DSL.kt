@@ -48,7 +48,7 @@ class TableBuilder(var table: Table = Table()) {
 	fun load(filename: String, withMetadata: Boolean = false) {
 		val fileVisitor = GlobFileVisitor(filename)
 
-		Files.walkFileTree(Paths.get("src/test/resources"), fileVisitor)
+		Files.walkFileTree(Paths.get("examples/src/main/resources"), fileVisitor)
 
 		val paths = fileVisitor.getMatchedFiles()
 		val tables = mutableListOf<Table>()

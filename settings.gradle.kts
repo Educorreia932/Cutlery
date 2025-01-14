@@ -1,2 +1,3 @@
-rootProject.name = "Cutlery"
+rootProject.name = "cutlery"
 
+include("library", "examples")
